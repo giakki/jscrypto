@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>TestCrypto</title>
+    </head>
+    <body>
+        <input id="cleartext-input" />
+        <button id="send-button" type="button">Send</button>
+        <input id="decrypted" readonly />
+
+        <script>
+            async function loadKey() {
+                const jwk = await fetch("/.well-known/jwk.json").then((res) =>
+                    res.json()
+                );
+                return window.crypto.subtle.importKey(
+                    "jwk",
+                    jwk,
+                    {
+                        name: "RSA-OAEP",
+                        hash: { name: "SHA-256" },
+                    },
+                    false,
+                    ["encrypt"]
+                );
+            }
+
+            async function encrypt(cleartext) {
+                const key = await loadKey();
+                const encoded = new TextEncoder().encode(cleartext);
+                const encryptedBuffer = await crypto.subtle.encrypt(
+                    { name: "RSA-OAEP" },
+                    key,
+                    encoded
+                );
+                return btoa(
+                    String.fromCodePoint(...new Uint8Array(encryptedBuffer))
+                );
+            }
+
+            document
+                .getElementById("send-button")
+                .addEventListener("click", async () => {
+                    const cleartext =
+                        document.getElementById("cleartext-input").value;
+
+                    const encrypted = await encrypt(cleartext);
+
+                    const response = await fetch("/", {
+                        method: "POST",
+                        body: JSON.stringify({ encrypted }),
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                    }).then((res) => res.json());
+
+                    document.getElementById("decrypted").value =
+                        response.decrypted;
+                });
+        </script>
+    </body>
+</html>
